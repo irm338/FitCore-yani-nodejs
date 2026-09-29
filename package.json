@@ -1,0 +1,28 @@
+{
+  "name": "fitcore-yani-nodejs",
+  "version": "1.0.0",
+  "description": "proyecto",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/irm338/FitCore-yani-nodejs.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/irm338/FitCore-yani-nodejs/issues"
+  },
+  "homepage": "https://github.com/irm338/FitCore-yani-nodejs#readme",
+  "dependencies": {
+    "chalk": "^6.0.1",
+    "dotenv": "^18.0.4",
+    "inquirer": "^14.2.2",
+    "mysql2": "^3.24.5"
+  }
+}
