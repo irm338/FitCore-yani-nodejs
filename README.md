@@ -81,6 +81,10 @@ O (Open/Closed Principle): Las clases están abiertas a extensiones pero cerrada
 
 D (Dependency Inversion Principle): Los componentes del menú dependen de abstracciones y servicios desacoplados del motor de base de datos.
 
+
+## link del video
+https://www.loom.com/share/3fa3ae27ed424ae7bdf3ceb615ee8a13
+
 ## Equipo y Roles (Scrum)
 Product Owner - PO: Irma Yaneht Arias García
 
