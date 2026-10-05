@@ -81,3 +81,5 @@ CREATE TABLE IF NOT EXISTS transacciones (
     descripcion TEXT,
     fecha DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+

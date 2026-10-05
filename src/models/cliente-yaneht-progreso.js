@@ -1,160 +1,99 @@
-
-import { MongoClient, ObjectId } from 'mongodb';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
+#!/usr/bin/env node
+import { Command } from 'commander';
+import mysql from 'mysql2';
 import fs from 'fs';
 import path from 'path';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-const DB_NAME = 'FitCore_db';
+const program = new Command();
 
+// Configuración de tu base de datos MySQL
+const dbConfig = {
+  host: 'campus2023',
+  user: 'campus2023',
+  password: '',
+  database: 'fitcore_db'
+};
 
-yargs(hideBin(process.argv))
-  .command(
-    'exportar:cliente',
-    'Exporta el progreso físico y nutricional de un cliente a un archivo JSON',
-    (yargs) => {
-      return yargs
-        .option('id', {
-          alias: 'i',
-          type: 'string',
-          description: 'ID de MongoDB del cliente',
-        })
-        .option('nombre', {
-          alias: 'n',
-          type: 'string',
-          description: 'Nombre del cliente (búsqueda parcial o exacta)',
-        });
-    },
-    async (argv) => {
-      const clientInputId = argv.id;
-      const clientInputName = argv.nombre;
+program
+  .requiredOption('-c, --client <identifier>', 'Nombre o ID del cliente')
+  .action(async (options) => {
+    const identifier = options.client;
+    const connection = await mysql.createConnection(dbConfig);
 
-      if (!clientInputId && !clientInputName) {
-        console.error(' Error: Debe proporcionar el ID (--id) o el Nombre (--nombre) del cliente.');
+    try {
+      // 1. Buscar al cliente por ID o Nombre
+      const isId = !isNaN(identifier);
+      const sqlClient = isId 
+        ? 'SELECT * FROM clients WHERE id = ?' 
+        : 'SELECT * FROM clients WHERE name LIKE ?';
+      const params = isId ? [identifier] : [`%${identifier}%`];
+
+      const [rows] = await connection.execute(sqlClient, params);
+      const client = rows[0];
+
+      if (!client) {
+        console.log(` No se encontró ningún cliente con: "${identifier}"`);
         process.exit(1);
       }
 
-      const mongoClient = new MongoClient(MONGO_URI);
+      console.log(` Cliente encontrado: ${client.name}`);
 
-      try {
-        console.log(' Conectando a la base de datos...');
-        await mongoClient.connect();
-        const db = mongoClient.db(DB_NAME);
+      // 2. Consultar datos relacionados
+      const [progress] = await connection.execute('SELECT * FROM progress_records WHERE client_id = ?', [client.id]);
+      const [mealPlans] = await connection.execute('SELECT * FROM meal_plans WHERE client_id = ?', [client.id]);
+      const [trainingPlans] = await connection.execute('SELECT id, plan_name, status FROM training_plans WHERE client_id = ?', [client.id]);
 
-        const clientsCollection = db.collection('clients');
-        const progressCollection = db.collection('progress_records');
-        const mealPlansCollection = db.collection('meal_plans');
-        const workoutPlansCollection = db.collection('workout_plans');
-
-        // 1. Validar existencia del cliente
-        let query = {};
-        if (clientInputId) {
-          if (!ObjectId.isValid(clientInputId)) {
-            console.error(' Error: El ID proporcionado no es un ObjectId válido de MongoDB.');
-            process.exit(1);
-          }
-          query._id = new ObjectId(clientInputId);
-        } else {
-          query.name = { $regex: clientInputName,$options: 'i' };
+      // 3. Estructurar el JSON final
+      const exportData = {
+        exportDate: new Date().toISOString(),
+        client: {
+          id: client.id,
+          name: client.name,
+          email: client.email,
+          phone: client.phone
+        },
+        progressRecords: progress.map(p => ({
+          date: p.date,
+          weight: p.weight,
+          bodyFat: p.body_fat,
+          measurements: JSON.parse(p.measurements || '{}'),
+          comments: p.comments,
+          photos: JSON.parse(p.photo_references || '[]')
+        })),
+        nutrition: {
+          mealPlans: mealPlans.map(mp => ({
+            planName: mp.plan_name,
+            status: mp.status,
+            dailyMeals: JSON.parse(mp.daily_meals || '[]')
+          }))
+        },
+        training: {
+          plans: trainingPlans.map(tp => ({
+            id: tp.id,
+            planName: tp.plan_name,
+            status: tp.status
+          }))
         }
+      };
 
-        const client = await clientsCollection.findOne(query);
-
-        if (!client) {
-          console.error(` Error: No se encontró ningún cliente con los datos proporcionados.`);
-          process.exit(1);
-        }
-
-        console.log(` Cliente encontrado: ${client.name} (ID: ${client._id})`);
-
-        // 2. Recopilar información relacionada de forma concurrente
-        const clientId = client._id;
-
-        const [progressRecords, mealPlans, workoutPlans] = await Promise.all([
-          progressCollection.find({ clientId }).sort({ date: -1 }).toArray(),
-          mealPlansCollection.find({ clientId }).toArray(),
-          workoutPlansCollection.find({ clientId }).toArray(),
-        ]);
-
-        // 3. Construir el objeto JSON jerárquico y consistente
-        const exportData = {
-          metadata: {
-            exportedAt: new Date().toISOString(),
-            version: '1.0.0',
-            system: 'FitnessBackupCLI'
-          },
-          client: {
-            id: client._id,
-            name: client.name,
-            email: client.email || null,
-            phone: client.phone || null,
-            createdAt: client.createdAt || null,
-            basicData: client.basicData || {}
-          },
-          progressRecords: progressRecords.map(record => ({
-            date: record.date,
-            weightKg: record.weight,
-            bodyFatPercentage: record.fat,
-            measurements: record.measurements || {},
-            comments: record.comments || '',
-            photoReferences: record.photoReferences || []
-          })),
-          nutrition: {
-            mealPlans: mealPlans.map(plan => ({
-              planName: plan.planName,
-              startDate: plan.startDate,
-              endDate: plan.endDate,
-              status: plan.status,
-              days: plan.days || [] // Contiene alimentos por día y calorías estimadas
-            }))
-          },
-          workouts: {
-            plans: workoutPlans.map(wPlan => ({
-              planName: wPlan.planName,
-              status: wPlan.status, // activos o pasados
-              startDate: wPlan.startDate,
-              endDate: wPlan.endDate,
-              referenceId: wPlan._id
-            }))
-          }
-        };
-
-        
-        const exportsDir = path.resolve(process.cwd(), 'exports');
-        if (!fs.existsSync(exportsDir)) {
-          fs.mkdirSync(exportsDir, { recursive: true });
-          console.log(' Carpeta /exports creada exitosamente.');
-        }
-
-        
-        const safeClientName = client.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, '_')
-          .replace(/_+/g, '_');
-        
-        const fileName = `cliente_${safeClientName}_progreso.json`;
-        const filePath = path.join(exportsDir, fileName);
-
-    
-        fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
-
-        console.log(` ¡Éxito! Archivo generado correctamente en: ${filePath}`);
-
-      } catch (error) {
-        console.error(' Error crítico durante la exportación:', error.message);
-        process.exit(1);
-      } finally {
-        await mongoClient.close();
+      // 4. Crear carpeta /exports si no existe
+      const exportsDir = path.join(process.cwd(), 'exports');
+      if (!fs.existsSync(exportsDir)) {
+        fs.mkdirSync(exportsDir, { recursive: true });
       }
+
+      // 5. Guardar el archivo JSON
+      const safeName = client.name.toLowerCase().replace(/\s+/g, '_');
+      const filePath = path.join(exportsDir, `cliente_${safeName}_progreso.json`);
+      
+      fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+      console.log(` Éxito: Archivo guardado en ${filePath}`);
+
+    } catch (error) {
+      console.error(' Error de ejecución:', error.message);
+    } finally {
+      await connection.end();
     }
-  )
-  .demandCommand(1, 'Debes especificar un comando válido.')
-  .help()
-  .parse();
-  
- 
-  
+  });
 
-
-  
+program.parse(process.argv);
