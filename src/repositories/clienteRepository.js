@@ -78,6 +78,8 @@ class ClientRepository {
 
 }
 
+// EXAMEN
+
 // Función para exportar el JSON del cliente
 export async function exportarHistorialCliente(clienteId) {
   try {
