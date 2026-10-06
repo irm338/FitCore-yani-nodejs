@@ -10,7 +10,7 @@ import planRepository from '../repositories/planRepository.js';
 import PlanModel from '../models/plan.js';
 import contractRepository from '../repositories/contractRepository.js';
 import ContractModel from '../models/contract.js';
-import { exportarHistorialCliente } from '../repositories/exportRepository.js';
+import { exportarHistorialCliente } from '../repositories/clienteRepository.js';
 
 // Función principal que muestra el menú en la consola
 export async function mostrarMenu() {
@@ -31,7 +31,8 @@ export async function mostrarMenu() {
                         { name: '1. Gestionar Clientes (CRUD)', value: 'CLIENTES' },
                         { name: '2. Gestionar Planes de Entrenamiento (CRUD)', value: 'PLANES' },
                         { name: '3. Gestionar Contratos (Asignar Plan)', value: 'CONTRATOS' },
-                        { name: '4. Salir', value: 'SALIR' }
+                        { name: '4. Exportar Historial de Cliente a JSON', value: 'EXPORTAR' },
+                        { name: '5. Salir', value: 'SALIR' }
                     ]
                 }
             ]);
@@ -197,6 +198,23 @@ export async function mostrarMenu() {
                         console.log(chalk.blue(' ℹ Operación cancelada.\n'));
                     }
                 }
+                } else if (respuesta.opcion === 'EXPORTAR_JSON') {
+                    const { idCliente } = await inquirer.prompt([
+                        {
+                            type: 'input',
+                            name: 'idCliente',
+                            message: chalk.cyan('Ingrese el ID del cliente a exportar:')
+                        }
+                    ]);
+        
+                    console.log(chalk.yellow('\n⏳ Generando archivo JSON desde MySQL...'));
+                    const resultado = await exportarHistorialCliente(idCliente);
+        
+                    if (resultado.exito) {
+                        console.log(chalk.green(`\n✔ ¡Éxito! ${resultado.mensaje}`));
+                    } else {
+                        console.log(chalk.red(`\n✖ Error: ${resultado.mensaje}`));
+                    }   
 
             // Submenú para Planes de Entrenamiento
             } else if (respuesta.opcion === 'PLANES') {
@@ -298,7 +316,7 @@ export async function mostrarMenu() {
                     } else {
                         console.log(chalk.blue(' ℹ Operación cancelada.\n'));
                     }
-                    
+
                 }
 
             } else if (respuesta.opcion === 'SALIR') {
