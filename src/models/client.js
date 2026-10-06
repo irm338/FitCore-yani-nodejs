@@ -9,6 +9,7 @@ class ClientModel {
       this.correo = correo;
 
     }
+    
   
     // 2. Método de validación: Se encarga de verificar que ningún campo clave esté vacío antes de enviarlo a la BD
     validate() {
@@ -40,3 +41,4 @@ class ClientModel {
   }
   
   export default ClientModel;
+

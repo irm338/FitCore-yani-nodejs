@@ -10,6 +10,7 @@ import planRepository from '../repositories/planRepository.js';
 import PlanModel from '../models/plan.js';
 import contractRepository from '../repositories/contractRepository.js';
 import ContractModel from '../models/contract.js';
+import { exportarHistorialCliente } from '../repositories/exportRepository.js';
 
 // Función principal que muestra el menú en la consola
 export async function mostrarMenu() {
@@ -297,6 +298,7 @@ export async function mostrarMenu() {
                     } else {
                         console.log(chalk.blue(' ℹ Operación cancelada.\n'));
                     }
+                    
                 }
 
             } else if (respuesta.opcion === 'SALIR') {
@@ -310,3 +312,4 @@ export async function mostrarMenu() {
         console.error(chalk.red('Ocurrió un error general en la aplicación:', error));
     }
 }
+
