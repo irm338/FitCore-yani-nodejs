@@ -1,6 +1,10 @@
 
 
 import database from '../config/database.js';
+import fs from 'fs';
+import path from 'path';
+
+
 
 class ClientRepository {
   constructor() {
@@ -67,6 +71,37 @@ class ClientRepository {
       throw error;
     }
   }
+
+
+
+
+
 }
+
+// Función para exportar el JSON del cliente
+export async function exportarHistorialCliente(clienteId) {
+  try {
+      const conexion = await database.conectar();
+      const [rows] = await conexion.query('SELECT * FROM clientes WHERE id = ?', [clienteId]);
+      if (rows.length === 0) return { exito: false, mensaje: "Cliente no encontrado." };
+      
+      const cliente = rows[0];
+      const datos = {
+          cliente: cliente,
+          fechaExportacion: new Date().toISOString()
+      };
+
+      const dir = path.join(process.cwd(), 'exports');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      const archivo = path.join(dir, `cliente_${cliente.id}_progreso.json`);
+      fs.writeFileSync(archivo, JSON.stringify(datos, null, 2));
+
+      return { exito: true, mensaje: `Guardado en /exports/` };
+  } catch (e) {
+      return { exito: false, mensaje: e.message };
+  }
+}
+
 
 export default new ClientRepository();
