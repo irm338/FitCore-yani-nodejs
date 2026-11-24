@@ -1,17 +1,24 @@
-
-
-
-// Importamos dotenv por si acaso y mysql2
+import 'dotenv/config';
 import mysql from 'mysql2/promise';
-import 'dotenv/config'; // Asegura que se lean las variables del .env
 
-class BaseDeDatos {
+class Database {
   constructor() {
-    // Creamos el pool de conexiones usando las variables del archivo .env
-    this.poolConexion = mysql.createPool({
-      host: process.env.DB_HOST || 'localhost',
+    this.pool = null;
+  }
+
+  createPool() {
+    // Validate non-secret connection settings before opening or caching a pool.
+    const requiredVariables = ['DB_HOST', 'DB_USER', 'DB_NAME'];
+    const missingVariables = requiredVariables.filter((name) => !process.env[name]?.trim());
+
+    if (missingVariables.length > 0) {
+      throw new Error(`Faltan variables de entorno requeridas: ${missingVariables.join(', ')}.`);
+    }
+
+    return mysql.createPool({
+      host: process.env.DB_HOST,
       user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
+      password: process.env.DB_PASSWORD ?? '',
       database: process.env.DB_NAME,
       waitForConnections: true,
       connectionLimit: 10,
@@ -19,33 +26,32 @@ class BaseDeDatos {
     });
   }
 
-  // Definimos ambos nombres (connect y conectar) para evitar errores
-  async conectar() {
-    return await this.connect();
+  getPool() {
+    // Reuse one pool for the whole CLI process instead of opening a connection per query.
+    if (!this.pool) {
+      this.pool = this.createPool();
+    }
+
+    return this.pool;
   }
 
   async connect() {
-    try {
-      // Probamos obtener una conexión para verificar que todo funcione
-      const conexion = await this.poolConexion.getConnection();
-      console.log("¡Conectado exitosamente a la base de datos MySQL!");
-      conexion.release(); // Devolvemos la conexión al pool
-      return this.poolConexion;
-    } catch (error) {
-      console.error("Error al conectar a la base de datos MySQL:", error.message);
-      throw error;
-    }
+    const connection = await this.getPool().getConnection();
+    connection.release();
   }
 
-  async desconectar() {
-    try {
-      await this.poolConexion.end();
-      console.log("Conexión a MySQL cerrada correctamente.");
-    } catch (error) {
-      console.error("Error al cerrar la conexión:", error.message);
+  async execute(query, parameters = []) {
+    const [rows] = await this.getPool().execute(query, parameters);
+    return rows;
+  }
+
+  async close() {
+    if (this.pool) {
+      const pool = this.pool;
+      this.pool = null;
+      await pool.end();
     }
   }
 }
 
-// Exportamos una única instancia lista para usar en todo el proyecto
-export default new BaseDeDatos();
+export default new Database();

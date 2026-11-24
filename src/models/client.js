@@ -1,44 +1,72 @@
+import ValidationError from './validationError.js';
 
+const clientFields = {
+  dpi: { label: 'DPI', maxLength: 20 },
+  nombre: { label: 'nombre', maxLength: 50 },
+  apellido: { label: 'apellido', maxLength: 50 },
+  correo: { label: 'correo', maxLength: 100 }
+};
 
-class ClientModel {
-    // 1. El constructor recibe los datos del cliente que vienen desde el menú CLI
-    constructor({ dpi, nombre, apellido, correo }) {
-      this.dpi = dpi;
-      this.nombre = nombre;
-      this.apellido = apellido;
-      this.correo = correo;
-
-    }
-    
-  
-    // 2. Método de validación: Se encarga de verificar que ningún campo clave esté vacío antes de enviarlo a la BD
-    validate() {
-      if (!this.dpi || this.dpi.trim() === '') {
-        throw new Error("El campo DPI es obligatorio.");
-      }
-      if (!this.nombre || this.nombre.trim() === '') {
-        throw new Error("El campo nombre es obligatorio.");
-      }
-      if (!this.apellido || this.apellido.trim() === '') {
-        throw new Error("El campo apellido es obligatorio.");
-      }
-      if (!this.correo || this.correo.trim() === '') {
-        throw new Error("El campo correo es obligatorio.");
-      }
-      return true;
-    }
-  
-    // 3. Método para transformar a formato de Base de Datos: Valida y devuelve un objeto limpio listo para MySQL
-    toDBModel() {
-      this.validate(); // Valida antes de transformar
-      return {
-        dpi: this.dpi,
-        nombre: this.nombre,
-        apellido: this.apellido,
-        correo: this.correo
-      };
-    }
+function validateText(value, field) {
+  if (typeof value !== 'string') {
+    throw new ValidationError(`El campo ${field.label} debe ser texto.`);
   }
-  
-  export default ClientModel;
 
+  const normalizedValue = value.trim();
+  if (!normalizedValue) {
+    throw new ValidationError(`El campo ${field.label} es obligatorio.`);
+  }
+  if (normalizedValue.length > field.maxLength) {
+    throw new ValidationError(`El campo ${field.label} no puede superar ${field.maxLength} caracteres.`);
+  }
+
+  return normalizedValue;
+}
+
+function validateEmail(email) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ValidationError('Ingresa un correo electrónico válido.');
+  }
+}
+
+// Normalizes and validates client input against the clientes table limits.
+class ClientModel {
+  constructor({ dpi, nombre, apellido, correo }) {
+    this.dpi = validateText(dpi, clientFields.dpi);
+    this.nombre = validateText(nombre, clientFields.nombre);
+    this.apellido = validateText(apellido, clientFields.apellido);
+    this.correo = validateText(correo, clientFields.correo);
+    validateEmail(this.correo);
+  }
+
+  static validateUpdates(updates) {
+    const allowedFields = ['nombre', 'apellido', 'correo'];
+    const entries = Object.entries(updates);
+
+    if (entries.length === 0 || entries.some(([field]) => !allowedFields.includes(field))) {
+      throw new ValidationError('Selecciona al menos un campo válido para actualizar.');
+    }
+
+    const normalizedUpdates = {};
+    for (const [field, value] of entries) {
+      normalizedUpdates[field] = validateText(value, clientFields[field]);
+    }
+
+    if (normalizedUpdates.correo) {
+      validateEmail(normalizedUpdates.correo);
+    }
+
+    return normalizedUpdates;
+  }
+
+  toDBModel() {
+    return {
+      dpi: this.dpi,
+      nombre: this.nombre,
+      apellido: this.apellido,
+      correo: this.correo
+    };
+  }
+}
+
+export default ClientModel;

@@ -1,84 +1,46 @@
-
-
-// Importamos la conexión a la base de datos
 import database from '../config/database.js';
 
-/**
- * Clase PlanRepository
- * Se encarga de manejar todas las operaciones con la tabla de planes en MySQL.
- */
+const editableFields = ['nombre', 'duracion', 'nivel', 'precioBase'];
+
+// Query columns mirror the planes schema; update keys are checked before interpolation.
 class PlanRepository {
-  constructor() {
-    this.tabla = 'planes';
+  async create(plan) {
+    const result = await database.execute(
+      'INSERT INTO planes (nombre, duracion, nivel, precioBase) VALUES (?, ?, ?, ?)',
+      [plan.nombre, plan.duracion, plan.nivel, plan.precioBase]
+    );
+
+    return { success: true, id: result.insertId };
   }
 
-  // Método auxiliar para obtener la conexión
-  async _obtenerConexion() {
-    return await database.conectar();
-  }
-
-  // Registrar un nuevo plan
-  async create(planData) {
-    try {
-      const conexion = await this._obtenerConexion();
-      
-      const columnas = Object.keys(planData).join(', ');
-      const valores = Object.values(planData);
-      const interrogaciones = valores.map(() => '?').join(', ');
-
-      const query = `INSERT INTO ${this.tabla} (${columnas}) VALUES (${interrogaciones})`;
-      const [resultado] = await conexion.execute(query, valores);
-      
-      return { success: true, id: resultado.insertId };
-    } catch (error) {
-      console.error("Error al registrar el plan:", error.message);
-      throw error;
-    }
-  }
-
-  // Obtener todos los planes
   async findAll() {
-    try {
-      const conexion = await this._obtenerConexion();
-      const query = `SELECT * FROM ${this.tabla}`;
-      const [filas] = await conexion.execute(query);
-      return filas;
-    } catch (error) {
-      console.error("Error al obtener los planes:", error.message);
-      throw error;
-    }
+    return database.execute(
+      'SELECT id, nombre, duracion, nivel, precioBase, fechaCreacion FROM planes ORDER BY id'
+    );
   }
 
-  // Actualizar un plan por su ID
-  async update(id, updateData) {
-    try {
-      const conexion = await this._obtenerConexion();
-      
-      const campos = Object.keys(updateData).map(key => `${key} = ?`).join(', ');
-      const valores = Object.values(updateData);
-
-      const query = `UPDATE ${this.tabla} SET ${campos} WHERE id = ?`;
-      const [resultado] = await conexion.execute(query, [...valores, id]);
-      
-      return resultado.affectedRows > 0;
-    } catch (error) {
-      console.error("Error al actualizar el plan:", error.message);
-      throw error;
+  async update(id, updates) {
+    const entries = Object.entries(updates);
+    if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) {
+      throw new TypeError('El identificador del plan no es válido.');
     }
+    if (entries.length === 0 || entries.some(([field]) => !editableFields.includes(field))) {
+      throw new TypeError('La actualización contiene campos no permitidos.');
+    }
+
+    const setClause = entries.map(([field]) => `${field} = ?`).join(', ');
+    const values = entries.map(([, value]) => value);
+    const result = await database.execute(
+      `UPDATE planes SET ${setClause} WHERE id = ?`,
+      [...values, Number(id)]
+    );
+
+    return result.affectedRows > 0;
   }
 
-  // Eliminar un plan por su ID
   async delete(id) {
-    try {
-      const conexion = await this._obtenerConexion();
-      const query = `DELETE FROM ${this.tabla} WHERE id = ?`;
-      const [resultado] = await conexion.execute(query, [id]);
-      
-      return resultado.affectedRows > 0;
-    } catch (error) {
-      console.error("Error al eliminar el plan:", error.message);
-      throw error;
-    }
+    const result = await database.execute('DELETE FROM planes WHERE id = ?', [id]);
+    return result.affectedRows > 0;
   }
 }
 

@@ -1,49 +1,33 @@
-
 import database from '../config/database.js';
 
+// Persist contracts without adding application-only fields to the SQL schema.
 class ContractRepository {
-  constructor() {
-    // Nombre de la tabla de contratos en tu base de datos MySQL
-    this.tabla = 'contratos';
+  async create(contract) {
+    const result = await database.execute(
+      `INSERT INTO contratos (idCliente, idPlan, costoTotal, metodoPago, fechaInicio)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        contract.idCliente,
+        contract.idPlan,
+        contract.costoTotal,
+        contract.metodoPago,
+        contract.fechaInicio
+      ]
+    );
+
+    return { success: true, id: result.insertId };
   }
 
-  // Método privado o auxiliar para obtener la conexión a la base de datos
-  async obtenerConexion() {
-    return await database.conectar();
-  }
-
-  // Inserta un contrato nuevo guardando todos los campos enviados por el modelo
-  async create(datosContrato) {
-    try {
-      const conexion = await this.obtenerConexion();
-      
-      // Obtenemos dinámicamente las columnas y los valores asegurando que se guarden
-      // costoTotal, metodoPago, fechaInicio, estado, idCliente e idPlan
-      const columnas = Object.keys(datosContrato).join(', ');
-      const valores = Object.values(datosContrato);
-      const interrogaciones = valores.map(() => '?').join(', ');
-
-      const query = `INSERT INTO ${this.tabla} (${columnas}) VALUES (${interrogaciones})`;
-      
-      const [resultado] = await conexion.execute(query, valores);
-      
-      return { success: true, id: resultado.insertId };
-    } catch (error) {
-      console.error("Error al registrar el contrato:", error.message);
-      throw error;
-    }
-  }
-
-  // Trae todos los contratos existentes en la tabla
   async findAll() {
-    try {
-      const conexion = await this.obtenerConexion();
-      const [filas] = await conexion.execute(`SELECT * FROM ${this.tabla}`);
-      return filas;
-    } catch (error) {
-      console.error("Error al obtener los contratos:", error.message);
-      throw error;
-    }
+    return database.execute(
+      `SELECT c.id, c.idCliente, c.idPlan, c.costoTotal, c.metodoPago, c.fechaInicio,
+              cl.nombre AS nombreCliente, cl.apellido AS apellidoCliente,
+              p.nombre AS nombrePlan
+       FROM contratos AS c
+       INNER JOIN clientes AS cl ON cl.id = c.idCliente
+       INNER JOIN planes AS p ON p.id = c.idPlan
+       ORDER BY c.fechaInicio DESC, c.id DESC`
+    );
   }
 }
 

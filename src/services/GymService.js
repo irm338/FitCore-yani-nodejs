@@ -1,68 +1,62 @@
-
-// Importamos los repositorios necesarios para gestionar clientes, contratos y planes
-import clienteRepository from '../repositories/clienteRepository.js';
+import ClientModel from '../models/client.js';
+import ContractModel from '../models/contract.js';
+import PlanModel from '../models/plan.js';
+import clientRepository from '../repositories/clientRepository.js';
 import contractRepository from '../repositories/contractRepository.js';
+import planRepository from '../repositories/planRepository.js';
 
-/**
- * Servicio del Gimnasio (GymService)
- * Controla la lógica de negocio para registrar y consultar clientes, contratos y operaciones del sistema.
- */
+// Coordinates input validation and repository calls for the CLI layer.
 class GymService {
-  
-  // ==========================================
-  // GESTIÓN DE CLIENTES
-  // ==========================================
-
-  // Registrar un nuevo cliente de forma segura
-  async registrarCliente(datosCliente) {
-    try {
-      const resultadoCliente = await clienteRepository.create(datosCliente);
-      console.log("¡Cliente registrado con éxito en la base de datos!");
-      return resultadoCliente;
-    } catch (error) {
-      console.error("Error en el servicio al registrar cliente:", error.message);
-      throw error;
-    }
+  // Models validate new records before repositories persist them.
+  async registrarCliente(data) {
+    return clientRepository.create(new ClientModel(data).toDBModel());
   }
 
-  // Obtener la lista de todos los clientes registrados
   async obtenerClientes() {
-    try {
-      const clientes = await clienteRepository.findAll();
-      return clientes;
-    } catch (error) {
-      console.error("Error en el servicio al obtener clientes:", error.message);
-      throw error;
-    }
+    return clientRepository.findAll();
   }
 
-  // ==========================================
-  // GESTIÓN DE CONTRATOS
-  // ==========================================
-
-  // Registrar un nuevo contrato
-  async registrarContrato(datosContrato) {
-    try {
-      const resultadoContrato = await contractRepository.create(datosContrato);
-      console.log("¡Contrato registrado con éxito en la base de datos!");
-      return resultadoContrato;
-    } catch (error) {
-      console.error("Error en el servicio al registrar contrato:", error.message);
-      throw error;
-    }
+  async actualizarCliente(id, updates) {
+    const normalizedUpdates = ClientModel.validateUpdates(updates);
+    return clientRepository.update(Number(id), normalizedUpdates);
   }
 
-  // Obtener la lista de todos los contratos
+  async eliminarCliente(id) {
+    return clientRepository.delete(Number(id));
+  }
+
+  async registrarPlan(data) {
+    return planRepository.create(new PlanModel(data).toDBModel());
+  }
+
+  async obtenerPlanes() {
+    return planRepository.findAll();
+  }
+
+  async actualizarPlan(id, updates) {
+    const normalizedUpdates = PlanModel.validateUpdates(updates);
+    return planRepository.update(Number(id), normalizedUpdates);
+  }
+
+  async eliminarPlan(id) {
+    return planRepository.delete(Number(id));
+  }
+
+  async registrarContrato(data) {
+    return contractRepository.create(new ContractModel(data).toDBModel());
+  }
+
   async obtenerContratos() {
-    try {
-      const contratos = await contractRepository.findAll();
-      return contratos;
-    } catch (error) {
-      console.error("Error en el servicio al obtener contratos:", error.message);
-      throw error;
-    }
+    return contractRepository.findAll();
   }
 
+  async obtenerHistorialCliente(id) {
+    const clientId = Number(id);
+    if (!Number.isSafeInteger(clientId) || clientId <= 0) {
+      throw new Error('El identificador del cliente debe ser un entero positivo.');
+    }
+    return clientRepository.findHistory(clientId);
+  }
 }
 
 export default new GymService();
